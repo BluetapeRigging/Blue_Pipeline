@@ -653,15 +653,37 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
                     text_edit.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
                     row.addWidget(text_edit)
                 else:
-                    # Default Maya file handling
-                    import_button = ImportButton("⟶", full_path, parent=self)
-                    import_button.setFixedSize(30, 30)
-                    import_button.setObjectName("BlueButton")
-                    import_button.clicked.connect(partial(self.open_maya_scene, full_path))
-
+                    # Default Maya file handling → three buttons (Open, Import, Reference)
                     btn_row = QtWidgets.QHBoxLayout()
                     btn_row.addStretch()
-                    btn_row.addWidget(import_button)
+
+                    # Open button
+                    open_btn = QtWidgets.QPushButton("Open")
+                    if tooltip_text:
+                        open_btn.setToolTip(tooltip_text)
+                    open_btn.setFixedSize(60, 30)
+                    open_btn.setObjectName("BlueButton")
+                    open_btn.clicked.connect(partial(self.open_maya_scene, full_path))
+                    btn_row.addWidget(open_btn)
+
+                    # Import button
+                    import_btn = QtWidgets.QPushButton("Import")
+                    if tooltip_text:
+                        import_btn.setToolTip(tooltip_text)
+                    import_btn.setFixedSize(60, 30)
+                    import_btn.setObjectName("BlueButton")
+                    import_btn.clicked.connect(partial(self.import_maya_scene, full_path))
+                    btn_row.addWidget(import_btn)
+
+                    # Reference button
+                    ref_btn = QtWidgets.QPushButton("Reference")
+                    if tooltip_text:
+                        ref_btn.setToolTip(tooltip_text)
+                    ref_btn.setFixedSize(80, 30)
+                    ref_btn.setObjectName("BlueButton")
+                    ref_btn.clicked.connect(partial(self.reference_maya_scene, full_path))
+                    btn_row.addWidget(ref_btn)
+
                     row.addLayout(btn_row)
 
                 layout.addLayout(row)
@@ -682,6 +704,24 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
             elif child.layout():
                 self.clear_layout(child.layout())  # recursive clear child layouts
                 child.layout().deleteLater()
+
+    def import_maya_scene(self, file_path):
+        try:
+            file_path = file_path.replace("\\", "/")
+            cmds.file(file_path, i=True, ignoreVersion=True, ra=True, mergeNamespacesOnClash=False, namespace=":")
+            print(f"Imported: {file_path}")
+        except Exception as e:
+            cmds.warning(f"Failed to import {file_path}: {e}")
+
+    def reference_maya_scene(self, file_path):
+        try:
+            file_path = file_path.replace("\\", "/")
+            cmds.file(file_path, r=True, ignoreVersion=True, gl=True, mergeNamespacesOnClash=False,
+                      namespace=os.path.splitext(os.path.basename(file_path))[0])
+            print(f"Referenced: {file_path}")
+        except Exception as e:
+            cmds.warning(f"Failed to reference {file_path}: {e}")
+
 
     def open_maya_scene(self, file_path):
         """Safely opens a Maya scene, prompting to save if there are unsaved changes."""
