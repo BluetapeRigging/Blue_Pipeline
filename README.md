@@ -3,6 +3,7 @@
 A lightweight **Asset Manager for Autodesk Maya**, built with Python and PySide2.  
 This tool helps you organize, browse, and manage shows and assets inside Maya projects with a simple UI.
 
+[![Watch the video](https://img.youtube.com/vi/JNhIpRGQC-0/0.jpg)](https://www.youtube.com/watch?v=JNhIpRGQC-0)
 
 ### ⚠️ Disclaimer
 
