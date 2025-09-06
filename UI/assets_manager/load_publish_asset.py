@@ -49,6 +49,7 @@ import maya.cmds as cmds
 import maya.mel as mel
 
 import os
+import re
 try:
     import importlib;from importlib import reload
 except:
@@ -145,32 +146,37 @@ class PublishAsset(QtBlueWindow.Qt_Blue):
             btn.style().polish(btn)
 
     # -------------------------------------------------------------------
-    def get_next_version_number(self):
-        pattern = f"{self.asset_name}_{self.task_name}_"
-        existing_files = [f for f in os.listdir(self.save_path) if f.startswith(pattern) and f.endswith(".ma")]
-
+    def get_next_version_number(self, folder_path, name, task, padding=4):
+        pattern = re.compile(rf"^{re.escape(name)}_{re.escape(task)}_(\d+)\.ma$")
         versions = []
-        for f in existing_files:
-            try:
-                v_str = f.split("_")[2]
-                versions.append(int(v_str))
-            except:
-                pass
-        next_version = max(versions) + 1 if versions else 1
-        return f"{next_version:04d}"
+
+        for f in os.listdir(folder_path):
+            if f.endswith(".ma"):
+                match = pattern.match(f)
+                if match:
+                    versions.append(int(match.group(1)))
+
+        if versions:
+            next_version = max(versions) + 1
+        else:
+            next_version = 1
+
+        return str(next_version).zfill(padding)
 
     def publish_asset(self):
 
         import getpass
         import datetime
 
-        version_str = self.get_next_version_number()
-        user = getpass.getuser()
-        time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
         # Remove b0001_ prefix if present in asset_name or task_name
         clean_asset = self.asset_name.split('_', 1)[-1] if '_' in self.asset_name else self.asset_name
         clean_task = self.task_name.split('_', 1)[-1] if '_' in self.task_name else self.task_name
+
+        version_str = self.get_next_version_number(folder_path=os.path.join(self.save_path, self.mode),
+                                                   name=clean_asset,
+                                                   task=clean_task)
+        user = getpass.getuser()
+        time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         filename = f"{clean_asset}_{clean_task}_{version_str}.ma"
         full_path = os.path.join(self.save_path, self.mode, filename)
