@@ -107,7 +107,7 @@ class PublishAsset(QtBlueWindow.Qt_Blue):
         self.task_name = os.path.basename(save_path)  # e.g., 'Model'
         self.setWindowTitle(Title)
 
-        self.setFixedSize(400, 200)
+        self.setFixedSize(400, 600)
         self.designer_loader_child(path=os.path.join(FOLDER, 'UI', FOLDER_NAME), ui_file=UI_File)
         self.set_title(Title)
 
@@ -123,7 +123,7 @@ class PublishAsset(QtBlueWindow.Qt_Blue):
 
         """
         self.set_blue_buttons()
-
+        self.ui.export_name_line.setText(self.get_versioning_name())
 
     def create_connections(self):
         """
@@ -132,8 +132,8 @@ class PublishAsset(QtBlueWindow.Qt_Blue):
 
         """
         self.ui.publish_asset_button.clicked.connect(self.publish_asset)
+        self.ui.publish_preset_combo.currentIndexChanged.connect(self.update_export_name)
 
-        #self.ui.button.clicked.connect(self.create_block)
 
     def set_blue_buttons(self):
         buttons = [
@@ -178,7 +178,20 @@ class PublishAsset(QtBlueWindow.Qt_Blue):
         user = getpass.getuser()
         time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        filename = f"{clean_asset}_{clean_task}_{version_str}.ma"
+        if self.ui.publish_preset_combo.currentText() == 'Versioning':
+            filename = self.get_versioning_name()
+        elif self.ui.publish_preset_combo.currentText() == 'Single File':
+            filename  = f"{clean_asset}_{clean_task}.ma"
+        elif self.ui.publish_preset_combo.currentText() == 'Selected as FBX':
+            #FBX will stop after export here
+            filename = f"{clean_asset}_{clean_task}.fbx"
+            full_path = os.path.join(self.save_path, self.mode, filename)
+            if not cmds.pluginInfo("fbxmaya", q=True, loaded=True):
+                cmds.loadPlugin("fbxmaya")
+            cmds.file(full_path, force=True, options="v = 0", type="FBX export", exportSelected=True)
+            return
+
+        #Versioning and single file continue
         full_path = os.path.join(self.save_path, self.mode, filename)
 
         # Save current scene
@@ -204,6 +217,47 @@ class PublishAsset(QtBlueWindow.Qt_Blue):
             cmds.warning(f"Failed to save WIP JSON: {e}")
 
         self.close()
+
+    def get_versioning_name(self):
+        """
+        Returns the full export filename that will be used on publish,
+        without actually saving.
+        """
+        # Clean asset and task (same as in publish_asset)
+        clean_asset = self.asset_name.split('_', 1)[-1] if '_' in self.asset_name else self.asset_name
+        clean_task = self.task_name.split('_', 1)[-1] if '_' in self.task_name else self.task_name
+
+        # Compute next version string
+        version_str = self.get_next_version_number(
+            folder_path=os.path.join(self.save_path, self.mode),
+            name=clean_asset,
+            task=clean_task
+        )
+
+        # Build filename
+        filename = f"{clean_asset}_{clean_task}_{version_str}.ma"
+        return filename
+
+    def update_export_name(self, index):
+        """
+        Update the export line edit based on combobox selection
+        """
+        preset = self.ui.publish_preset_combo.currentText()
+
+        clean_asset = self.asset_name.split('_', 1)[-1] if '_' in self.asset_name else self.asset_name
+        clean_task = self.task_name.split('_', 1)[-1] if '_' in self.task_name else self.task_name
+
+        if preset == 'Versioning':
+            filename = self.get_versioning_name()
+        elif preset == 'Single File':
+            filename = f"{clean_asset}_{clean_task}.ma"
+        elif preset == 'Selected as FBX':
+            filename = f"{clean_asset}_{clean_task}.fbx"
+        else:
+            filename = f"{clean_asset}_{clean_task}"
+
+        self.ui.export_name_line.setText(filename)
+
 
     # CLOSE EVENTS _________________________________
     def closeEvent(self, event):
