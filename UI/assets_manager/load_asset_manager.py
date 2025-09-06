@@ -402,16 +402,26 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
 
         return folder_paths
 
-    def set_last_used_show(self, current_show):
+    def set_last_used_show(self, current_show, current_asset=None, current_task=None):
         json_path = self.get_default_json_path()
         data = self.check_settings_json()
         data['last_show'] = current_show
+        if current_asset:
+            data['last_asset'] = current_asset
+        if current_task:
+            data['last_task'] = current_task
         with open(json_path, "w") as f:
             json.dump(data, f, indent=4)
 
     def read_last_used_show(self):
         data = self.check_settings_json()
         return data.get('last_show', None)
+
+    def read_last_used_asset_task(self):
+        data = self.check_settings_json()
+        last_asset = data.get('last_asset', None)
+        last_task = data.get('last_task', None)
+        return last_asset, last_task
 
     def populate_assets(self, show_path):
         """
@@ -523,6 +533,13 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
         self.current_task = None
         self.update_window_title()
 
+        # Auto-populate last asset if exists
+        last_asset, last_task = self.read_last_used_asset_task()
+        if last_asset in assets:
+            self.populate_tasks(self.current_show, last_asset)
+            if last_task:
+                self.populate_files(self.current_show, last_asset, last_task)
+
         return assets
 
     def populate_tasks(self, show_path, asset_name):
@@ -535,6 +552,9 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
         """
         layout = self.ui.tasks_layout
         self.current_asset = asset_name
+        self.current_asset = asset_name
+        # Save the last asset
+        self.set_last_used_show(self.current_show, current_asset=self.current_asset)
 
         # Clear previous buttons
         while layout.count():
@@ -581,6 +601,8 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
             task_name (str): Task folder name.
         """
         self.current_task = task_name
+        # Save last task as well
+        self.set_last_used_show(self.current_show, current_asset=self.current_asset, current_task=self.current_task)
 
         # Clear previous file buttons
         for layout in [self.ui.wip_layout, self.ui.publish_layout]:
