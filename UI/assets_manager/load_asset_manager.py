@@ -31,7 +31,6 @@ ICONS
 JSON FILES
 
 #----------------
-licence: https://www.eulatemplate.com/live.php?token=FGISW7ApRfgywum6murbBmLcusKONzkv
 author:  Esteban Rodriguez <info@renderdemartes.com>
 
 '''
@@ -117,7 +116,6 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
 
         self.designer_loader_child(path=os.path.join(FOLDER, 'UI', FOLDER_NAME), ui_file=UI_File)
         self.set_title(Title)
-
         self.create_layout()
         self.create_connections()
 
@@ -130,6 +128,7 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
         Initialize the UI layout and populate the first show and its assets.
         If no shows exist, prompt the user to create the first one.
         """
+        self.create_menu()
         paths = self.populate_shows()
         last_path = self.read_last_used_show()
 
@@ -367,6 +366,13 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
         folder_names, folder_paths = self.get_shows_folders()
         layout = self.ui.shows_layout
 
+        #Check NDA mode:
+        json_path = self.get_default_json_path()
+        # Load or initialize settings
+        with open(json_path, "r") as f:
+            settings = json.load(f)
+        nda_mode = settings["nda_mode"]
+
         # Clear existing widgets in layout if needed
         while layout.count():
             child = layout.takeAt(0)
@@ -385,10 +391,13 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
         for path, name in combined:
             print(name, path)
             pretty_label = self.split_camel_case(name)
+            if nda_mode:
+                pretty_label = f"{pretty_label[0]}*****{pretty_label[-1]}"
             button = QtWidgets.QPushButton(pretty_label)
             button.setObjectName("BlueButton")
             button.setFixedSize(80, 40)
-            button.setToolTip(f"{name}: {path}")
+            if not nda_mode:
+                button.setToolTip(f"{name}: {path}")
 
             # Use partial to bind 'path' without worrying about 'checked' arg
             button.clicked.connect(partial(self.populate_assets, path))
