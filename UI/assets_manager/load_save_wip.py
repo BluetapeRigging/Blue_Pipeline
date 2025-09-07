@@ -32,7 +32,6 @@ ICONS
 JSON FILES
 
 #----------------
-licence: https://www.eulatemplate.com/live.php?token=FGISW7ApRfgywum6murbBmLcusKONzkv
 author:  Esteban Rodriguez <info@renderdemartes.com>
 
 '''
