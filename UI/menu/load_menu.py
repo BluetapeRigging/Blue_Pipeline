@@ -81,6 +81,8 @@ class Menu(QtWidgets.QDialog):
         #Create Menu Actions on File Section
         self.nda_mode = self.fileMenu.addAction('NDA Mode')
         self.fileMenu.addSeparator()
+        self.download_latest = self.fileMenu.addAction('Download Latest')
+        self.fileMenu.addSeparator()
 
         #Add actions to file menu
         self.menuBar.addMenu(self.fileMenu)
@@ -93,6 +95,7 @@ class Menu(QtWidgets.QDialog):
     def create_connections(self):
         #FILE MENU
         self.nda_mode.triggered.connect(self.toggle_nda_mode)
+        self.download_latest.triggered.connect(self.open_link_donwload_latest)
 
     # -------------------------------------------------------------------
 
@@ -130,6 +133,11 @@ class Menu(QtWidgets.QDialog):
 
         print(f"NDA Mode set to: {settings['nda_mode']}")
         return settings["nda_mode"]
+
+    def open_link_donwload_latest(self):
+        import webbrowser
+        webbrowser.open("https://github.com/BluetapeRigging/Blue_Pipeline/archive/refs/heads/main.zip")
+        webbrowser.open("https://github.com/BluetapeRigging/Blue_Pipeline")
 
     # CLOSE EVENTS _________________________________
     def closeEvent(self, event):
