@@ -38,11 +38,18 @@ from maya import cmds
 from maya import mel
 from pathlib import Path
 
-from PySide2 import QtUiTools
-from PySide2 import QtWidgets
-from PySide2.QtWidgets import *
-from PySide2 import QtGui,QtCore
-from shiboken2 import wrapInstance
+try:
+    from shiboken6 import wrapInstance
+    from PySide6 import QtUiTools
+    from PySide6 import QtWidgets
+    from PySide6.QtWidgets import *
+    from PySide6 import QtGui, QtCore
+except:
+    from shiboken2 import wrapInstance #Compatibility pre 2026
+    from PySide2 import QtUiTools
+    from PySide2 import QtWidgets
+    from PySide2.QtWidgets import *
+    from PySide2 import QtGui,QtCore
 
 
 from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
@@ -241,12 +248,18 @@ class Qt_Blue(QtWidgets.QMainWindow):
     def move_to_center_screen(self):
         """Move the main UI to the center of the screen."""
         qtRectangle = self.frameGeometry()
-        centerPoint = QDesktopWidget().availableGeometry().center()
+
+        try:
+            # PySide6
+            app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+            screen = app.primaryScreen()  # get the main screen
+            centerPoint = screen.availableGeometry().center()
+        except AttributeError:
+            # PySide2
+            centerPoint = QtWidgets.QDesktopWidget().availableGeometry().center()
+
         qtRectangle.moveCenter(centerPoint)
         self.move(qtRectangle.topLeft())
-        centerPoint = QDesktopWidget().availableGeometry().center()
-        qtRectangle.moveCenter(centerPoint)
-        self.move(qtRectangle.topLeft()/2)
 
     def mousePressEvent(self, event):
         """
