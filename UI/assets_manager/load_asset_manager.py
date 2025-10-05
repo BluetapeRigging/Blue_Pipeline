@@ -69,6 +69,8 @@ import json
 import glob
 import pprint
 from pathlib import Path
+from collections import defaultdict
+
 from Blue_Pipeline.Utils.Helpers.decorators import undo
 
 
@@ -126,6 +128,7 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
         self.create_layout()
         self.create_connections()
 
+        self.find_name_conflicts()
 
 
     # -------------------------------------------------------------------
@@ -164,6 +167,84 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
         self.ui.add_task_button.clicked.connect(self.create_new_task)
         self.ui.save_wip_button.clicked.connect(self.save_wip)
         self.ui.publish_button.clicked.connect(self.publish_asset)
+
+    def find_name_conflicts(self):
+        """
+        Fast duplicate name finder using glob pattern:
+        /media/vancouver/BlueTape/*/*/*/{Wip,Publish}
+        Shows a scrollable dialog if conflicts exist.
+        """
+
+        root = self.project_folder
+
+        # Gather all Wip and Publish files fast
+        wip_paths = glob.glob(os.path.join(root, "*", "*", "*", "WIP", "*conflict*"), recursive=False)
+        pub_paths = glob.glob(os.path.join(root, "*", "*", "*", "Publish", "*conflicts*"), recursive=False)
+        task_paths = glob.glob(os.path.join(root, "*", "*", "*", "*conflicts*"), recursive=False)
+        conflicts_paths = wip_paths + pub_paths + task_paths
+
+        if not conflicts_paths:
+            return True
+
+        conflicts = conflicts_paths
+
+        if not conflicts:
+            QtWidgets.QMessageBox.information(self, "No Conflicts", "✅ No duplicate file names found.")
+            return
+
+        # --- Scrollable dialog for conflicts ---
+        def show_conflicts_dialog(conflicts):
+            dialog = QtWidgets.QDialog(self)
+            dialog.setWindowTitle("Conflicts File Names Found")
+            layout = QtWidgets.QVBoxLayout(dialog)
+
+            # Scrollable text area
+            text_edit = QtWidgets.QPlainTextEdit(dialog)
+            text_edit.setReadOnly(True)
+            msg_text = "⚠ Found conflicting file names:\n\n"
+            for name in conflicts:
+                msg_text += f"• {name}\n"
+            text_edit.setPlainText(msg_text)
+            layout.addWidget(text_edit)
+
+            # Yes / No buttons
+            buttons = QtWidgets.QDialogButtonBox(
+                QtWidgets.QDialogButtonBox.Yes | QtWidgets.QDialogButtonBox.No,
+                parent=dialog
+            )
+            layout.addWidget(buttons)
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+
+            # Fixed reasonable size
+            dialog.resize(600, 400)
+
+            return dialog.exec_() == QtWidgets.QDialog.Accepted
+
+        # Ask user for confirmation
+        if show_conflicts_dialog(conflicts):
+            failed = []
+            for path in conflicts:
+                try:
+                    os.remove(path)
+                except Exception:
+                    failed.append(path)
+
+            if failed:
+                QtWidgets.QMessageBox.critical(
+                    self,
+                    "Permission Error",
+                    "Some files could not be deleted.\n"
+                    "Try reopening Maya as Administrator.\n\n"
+                    "Failed files:\n" + "\n".join(failed[:10]) +
+                    ("\n...and more" if len(failed) > 10 else "")
+                )
+            else:
+                QtWidgets.QMessageBox.information(
+                    self,
+                    "Deletion Complete",
+                    "🗑️ All conflicting files were deleted successfully."
+                )
 
     #----------------------------------------------------------
     #-----------------------Folder Struct----------------------
