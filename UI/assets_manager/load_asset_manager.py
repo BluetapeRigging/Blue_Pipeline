@@ -772,36 +772,47 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
                     text_edit.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
                     row.addWidget(text_edit)
                 else:
-                    # Default Maya file handling → three buttons (Open, Import, Reference)
+                    # Default Maya file handling → three buttons (Open, Import, Reference and settings)
                     btn_row = QtWidgets.QHBoxLayout()
                     btn_row.addStretch()
 
+                    def create_icon_button(icon, tooltip, callback, size=(30, 30)):
+                        btn = QtWidgets.QPushButton()
+                        btn.setIcon(QtGui.QIcon(os.path.join(IconsPath, icon)))
+                        btn.setIconSize(QtCore.QSize(size[0]/1.5, size[0]/1.5))
+                        btn.setToolTip(tooltip)
+                        btn.setFixedSize(*size)
+                        btn.setObjectName("BlueButton")
+                        btn.clicked.connect(callback)
+                        return btn
+
                     # Open button
-                    open_btn = QtWidgets.QPushButton("Open")
-                    if tooltip_text:
-                        open_btn.setToolTip(tooltip_text)
-                    open_btn.setFixedSize(60, 30)
-                    open_btn.setObjectName("BlueButton")
-                    open_btn.clicked.connect(partial(self.open_maya_scene, full_path))
+                    open_btn = create_icon_button(
+                        "open.png", "Open", partial(self.open_maya_scene, full_path)
+                    )
                     btn_row.addWidget(open_btn)
 
                     # Import button
-                    import_btn = QtWidgets.QPushButton("Import")
-                    if tooltip_text:
-                        import_btn.setToolTip(tooltip_text)
-                    import_btn.setFixedSize(60, 30)
-                    import_btn.setObjectName("BlueButton")
-                    import_btn.clicked.connect(partial(self.import_maya_scene, full_path))
+                    import_btn = create_icon_button(
+                        "import.png", "Import", partial(self.import_maya_scene, full_path)
+                    )
                     btn_row.addWidget(import_btn)
 
                     # Reference button
-                    ref_btn = QtWidgets.QPushButton("Reference")
-                    if tooltip_text:
-                        ref_btn.setToolTip(tooltip_text)
-                    ref_btn.setFixedSize(80, 30)
-                    ref_btn.setObjectName("BlueButton")
-                    ref_btn.clicked.connect(partial(self.reference_maya_scene, full_path))
+                    ref_btn = create_icon_button(
+                        "reference.png", "Reference", partial(self.reference_maya_scene, full_path)
+                    )
                     btn_row.addWidget(ref_btn)
+
+                    '''
+                    if 'rig' in self.current_task.lower():
+                        # Settings button
+                        # Button function at the end of file
+                        settings_btn = create_icon_button(
+                            "settings.png", "Settings", partial(open_settings, full_path)
+                        )
+                        btn_row.addWidget(settings_btn)
+                    '''
 
                     row.addLayout(btn_row)
 
@@ -1243,6 +1254,14 @@ class ImagePreview(QtWidgets.QLabel):
 
             self.setPixmap(pixmap)
             self.setFixedSize(pixmap.size())  # fix label size to pixmap size
+
+
+def open_settings(path):
+    from Blue_Pipeline.UI.assets_manager import load_rig_settings
+    reload(load_rig_settings)
+    cRigSettingsUI = load_rig_settings.RigSettingsUI(file_path=path)
+    cRigSettingsUI.show()
+
 
 '''
 #Notes
