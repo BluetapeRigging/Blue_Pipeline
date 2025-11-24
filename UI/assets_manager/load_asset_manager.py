@@ -399,7 +399,9 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
 
         if not os.path.isdir(self.project_folder):
             print(f"Project folder does not exist or is not a folder: {self.project_folder}")
-            return []
+            folder = self.change_project_folder()
+            self.project_folder = folder
+            self.get_shows_folders()
 
         folder_names = []
         folder_paths = []
