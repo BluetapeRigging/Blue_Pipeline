@@ -195,6 +195,29 @@ class PublishAsset(QtBlueWindow.Qt_Blue):
             if not cmds.pluginInfo("fbxmaya", q=True, loaded=True):
                 cmds.loadPlugin("fbxmaya")
             cmds.file(full_path, force=True, options="v = 0", type="FBX export", exportSelected=True)
+            self.in_view_message(full_path)
+            self.close()
+            return
+        elif self.ui.publish_preset_combo.currentText() == 'Selected Asset as Alembic':
+            filename = self.get_versioning_name('.abc')
+            full_path = os.path.join(self.save_path, self.mode, filename)
+            full_path = os.path.normpath(full_path)
+            print(full_path)
+            if not cmds.pluginInfo("AbcExport", q=True, loaded=True):
+                cmds.loadPlugin("AbcExport")
+            self.export_alembic_static(full_path)
+            self.in_view_message(full_path)
+            self.close()
+            return
+        elif self.ui.publish_preset_combo.currentText() == 'Selected Animation as Alembic':
+            filename = self.get_versioning_name('.abc')
+            full_path = os.path.join(self.save_path, self.mode, filename)
+            full_path = os.path.normpath(full_path)
+            if not cmds.pluginInfo("AbcExport", q=True, loaded=True):
+                cmds.loadPlugin("AbcExport")
+            self.export_alembic_animation(full_path)
+            self.in_view_message(full_path)
+            self.close()
             return
 
         #Versioning and single file continue
@@ -221,10 +244,73 @@ class PublishAsset(QtBlueWindow.Qt_Blue):
             cmds.inViewMessage(amg=f"Saved: <hl>{filename}</hl>", pos='topCenter', fade=True)
         except Exception as e:
             cmds.warning(f"Failed to save WIP JSON: {e}")
-
+        self.in_view_message(full_path)
         self.close()
 
-    def get_versioning_name(self):
+    def in_view_message(self, full_path):
+        cmds.inViewMessage(
+            amg=f"<span style='color:yellow;'>Alembic Exported:</span> {full_path}",
+            pos="topCenter",
+            fade=True
+        )
+
+    def export_alembic_static(self, full_path, selection=None):
+        # Normalize path for Alembic
+        full_path = os.path.normpath(full_path).replace("\\", "/")
+
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+
+        # Get proper selection (transforms only)
+        if selection is None:
+            selection = cmds.ls(sl=True, long=True)
+
+        selection = cmds.ls(selection, dag=True, type="transform", long=True)
+
+        if not selection:
+            cmds.warning("Nothing selected for Alembic export.")
+            return
+
+        # Build roots
+        root_flags = " ".join([f'-root "{obj}"' for obj in selection])
+
+        # Build job
+        job = f'-frameRange 1 1 -writeVisibility -worldSpace {root_flags} -file "{full_path}"'
+
+        # Run export
+        cmds.AbcExport(j=job)
+        print(f"[OK] Static Alembic exported → {full_path}")
+
+    def export_alembic_animation(self, full_path, selection=None, start=None, end=None):
+        full_path = os.path.normpath(full_path).replace("\\", "/")
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+
+        if selection is None:
+            selection = cmds.ls(sl=True, long=True)
+
+        selection = cmds.ls(selection, dag=True, type="transform", long=True)
+
+        if not selection:
+            cmds.warning("Nothing selected for Alembic animation export.")
+            return
+
+        if start is None:
+            start = cmds.playbackOptions(q=True, min=True)
+        if end is None:
+            end = cmds.playbackOptions(q=True, max=True)
+
+        root_flags = " ".join([f'-root "{obj}"' for obj in selection])
+
+        job = (
+            f'-frameRange {start} {end} '
+            f'-uvWrite -writeVisibility -worldSpace {root_flags} '
+            f'-file "{full_path}"'
+        )
+
+        cmds.AbcExport(j=job)
+        print(f"[OK] Animated Alembic exported → {full_path}")
+
+    def get_versioning_name(self, ext='.ma'):
         """
         Returns the full export filename that will be used on publish,
         without actually saving.
@@ -241,7 +327,7 @@ class PublishAsset(QtBlueWindow.Qt_Blue):
         )
 
         # Build filename
-        filename = f"{clean_asset}_{clean_task}_{version_str}.ma"
+        filename = f"{clean_asset}_{clean_task}_{version_str}{ext}"
         return filename
 
     def update_export_name(self, index):
@@ -259,6 +345,10 @@ class PublishAsset(QtBlueWindow.Qt_Blue):
             filename = f"{clean_asset}_{clean_task}.ma"
         elif preset == 'Selected as FBX':
             filename = f"{clean_asset}_{clean_task}.fbx"
+        elif preset == 'Selected Asset as Alembic':
+            filename = self.get_versioning_name('.abc')
+        elif preset == 'Selected Animation as Alembic':
+            filename = self.get_versioning_name('.abc')
         else:
             filename = f"{clean_asset}_{clean_task}"
 

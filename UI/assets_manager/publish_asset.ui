@@ -61,6 +61,16 @@
           <string>Selected as FBX</string>
          </property>
         </item>
+        <item>
+         <property name="text">
+          <string>Selected Asset as Alembic</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Selected Animation as Alembic</string>
+         </property>
+        </item>
        </widget>
       </item>
      </layout>

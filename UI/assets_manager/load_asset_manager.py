@@ -728,7 +728,7 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
                 return
 
             files = [f for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f))]
-            files = [f for f in files if f.endswith(('.ma', '.mb', '.py', '.mel'))]
+            files = [f for f in files if f.endswith(('.ma', '.mb', '.py', '.mel', '.fbx', '.abc'))]
             files.sort(reverse=True)
 
             for f in files:
