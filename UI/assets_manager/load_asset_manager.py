@@ -125,10 +125,14 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
 
         self.designer_loader_child(path=os.path.join(FOLDER, 'UI', FOLDER_NAME), ui_file=UI_File)
         self.set_title(Title)
+
+        self.show_buttons = []
+
         self.create_layout()
         self.create_connections()
 
         self.find_name_conflicts()
+        QtCore.QTimer.singleShot(0, self.force_initial_resize)
 
 
     # -------------------------------------------------------------------
@@ -154,6 +158,12 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
 
         self.set_blue_buttons()
 
+    def force_initial_resize(self):
+        # Fake a tiny resize to force Qt to recalc layouts + icon sizes
+        size = self.size()
+        self.resize(size.width() + 1, size.height() + 1)
+        self.resize(size)
+
     def create_connections(self):
         """
 
@@ -167,6 +177,7 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
         self.ui.add_task_button.clicked.connect(self.create_new_task)
         self.ui.save_wip_button.clicked.connect(self.save_wip)
         self.ui.publish_button.clicked.connect(self.publish_asset)
+        self.ui.shows_search_line.textChanged.connect(self.filter_shows)
 
     def find_name_conflicts(self):
         """
@@ -453,6 +464,9 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
         return re.sub(r'(?<=[a-z])(?=[A-Z])', '\n', name)
 
     def populate_shows(self):
+
+        self.show_buttons = []
+
         folder_names, folder_paths = self.get_shows_folders()
         layout = self.ui.shows_layout
 
@@ -483,7 +497,11 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
             pretty_label = self.split_camel_case(name)
             if nda_mode:
                 pretty_label = f"{pretty_label[0]}*****{pretty_label[-1]}"
+
             button = QtWidgets.QPushButton(pretty_label)
+            button._show_name = name.lower()  # searchable name
+            button._show_path = path  # full folder
+
             button.setObjectName("BlueButton")
             button.setFixedSize(80, 40)
             if not nda_mode:
@@ -493,6 +511,7 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
             button.clicked.connect(partial(self.populate_assets, path))
 
             layout.addWidget(button)
+            self.show_buttons.append(button)
 
         self.clear_layout(self.ui.wip_layout)
         self.clear_layout(self.ui.publish_layout)
@@ -521,6 +540,14 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
         last_asset = data.get('last_asset', None)
         last_task = data.get('last_task', None)
         return last_asset, last_task
+
+    def filter_shows(self, text):
+        text = text.strip().lower()
+
+        for button in self.show_buttons:
+            button.setVisible(not text or text in button._show_name)
+
+        self.ui.shows_layout.invalidate()
 
     def populate_assets(self, show_path):
         """
