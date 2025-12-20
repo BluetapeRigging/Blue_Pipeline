@@ -106,7 +106,6 @@ class Qt_Blue(QtWidgets.QMainWindow):
         self.popup_mode = False
         self.make_frameless()
         self.set_margins()
-        self.move_to_center_screen()
         self.set_title()
         self.set_stylesheet(widget = self.master_ui)
 
@@ -114,6 +113,7 @@ class Qt_Blue(QtWidgets.QMainWindow):
 
         self.minimize_state = False
         self.minimize_size = self.master_ui.size()
+        QtCore.QTimer.singleShot(0, self.move_to_center_screen)
 
     # -------------------------------------------------
 
@@ -246,20 +246,16 @@ class Qt_Blue(QtWidgets.QMainWindow):
         self.move(25,25)
 
     def move_to_center_screen(self):
-        """Move the main UI to the center of the screen."""
-        qtRectangle = self.frameGeometry()
+        """Move the UI to the center of the screen where the parent (Maya) is."""
+        parent = self.parent() or get_maya_main_window()
+        screen = QtGui.QGuiApplication.screenAt(parent.frameGeometry().center())
 
-        try:
-            # PySide6
-            app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-            screen = app.primaryScreen()  # get the main screen
-            centerPoint = screen.availableGeometry().center()
-        except AttributeError:
-            # PySide2
-            centerPoint = QtWidgets.QDesktopWidget().availableGeometry().center()
+        if not screen:
+            screen = QtGui.QGuiApplication.primaryScreen()
 
-        qtRectangle.moveCenter(centerPoint)
-        self.move(qtRectangle.topLeft())
+        geo = self.frameGeometry()
+        geo.moveCenter(screen.availableGeometry().center())
+        self.move(geo.topLeft())
 
     def mousePressEvent(self, event):
         """
