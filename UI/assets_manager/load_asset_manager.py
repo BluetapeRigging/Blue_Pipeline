@@ -264,6 +264,10 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
         self.version_delete_dialog = None
         self._script_highlighters = []
 
+        # Sorting state
+        self.sort_settings = self.load_sort_settings()
+        self.sort_buttons = {}
+
         self.setWindowTitle(Title)
         self.where_to_save_files = None
 
@@ -280,6 +284,108 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
         self.find_name_conflicts()
         self.register_scene_opened_callback()
         QtCore.QTimer.singleShot(0, self.force_initial_resize)
+
+        self.add_sort_buttons_to_sections()
+
+    def add_sort_buttons_to_sections(self):
+        # Add sort buttons next to each section label (Shows, Assets, Task, Files)
+        # Shows
+        shows_group = self.ui.groupBox
+        self.sort_buttons['shows'] = self._add_sort_button_to_groupbox(shows_group, 'shows')
+        # Assets
+        assets_group = self.ui.groupBox_2
+        self.sort_buttons['assets'] = self._add_sort_button_to_groupbox(assets_group, 'assets')
+        # Task
+        task_group = self.ui.groupBox_3
+        self.sort_buttons['task'] = self._add_sort_button_to_groupbox(task_group, 'task')
+        # Files
+        files_group = self.ui.groupBox_4
+        self.sort_buttons['files'] = self._add_sort_button_to_groupbox(files_group, 'files')
+
+    def _add_sort_button_to_groupbox(self, groupbox, section_key):
+        # Add a small, transparent, icon-only button to the top-right of the groupbox
+        btn = QtWidgets.QPushButton("⇅", groupbox)
+        btn.setFixedSize(18, 18)
+        btn.setStyleSheet("""
+            QPushButton {
+                font-size: 12px;
+                padding: 0;
+                margin: 0;
+                border: none;
+                background: transparent;
+                color: #888;
+            }
+            QPushButton:hover {
+                color: #3b5998;
+                background: rgba(80, 120, 200, 0.08);
+            }
+            QPushButton:pressed {
+                color: #1a2a44;
+                background: rgba(80, 120, 200, 0.18);
+            }
+        """)
+        btn.setToolTip("Sort options")
+        btn.setCursor(QtCore.Qt.PointingHandCursor)
+        btn.clicked.connect(lambda checked=False, k=section_key: self.show_sort_menu(k))
+        # Position the button (absolute, top-right)
+        btn.move(groupbox.width() - 22, 2)
+        btn.raise_()
+        groupbox.installEventFilter(self)
+        return btn
+
+    def eventFilter(self, obj, event):
+        # Reposition sort buttons if groupbox resizes
+        for key, btn in self.sort_buttons.items():
+            groupbox = btn.parent()
+            if obj is groupbox and event.type() == QtCore.QEvent.Resize:
+                btn.move(groupbox.width() - 22, 2)
+        return super().eventFilter(obj, event)
+
+    def show_sort_menu(self, section):
+        menu = QtWidgets.QMenu()
+        # Current sort state
+        current = self.sort_settings.get(section, {"by": "name", "order": "asc"})
+        # Add actions
+        for by in ["name", "date"]:
+            for order, label in [("asc", "Ascending"), ("desc", "Descending")]:
+                text = f"Sort by {by.title()} ({label})"
+                action = QtGui.QAction(text, menu)
+                action.setCheckable(True)
+                action.setChecked(current["by"] == by and current["order"] == order)
+                action.triggered.connect(lambda checked=False, b=by, o=order, s=section: self.set_sort(s, b, o))
+                menu.addAction(action)
+        # Show menu at cursor
+        menu.exec_(QtGui.QCursor.pos())
+
+    def set_sort(self, section, by, order):
+        self.sort_settings[section] = {"by": by, "order": order}
+        self.save_sort_settings()
+        # Refresh the relevant section
+        if section == "shows":
+            self.populate_shows()
+        elif section == "assets":
+            self.populate_assets(self.current_show)
+        elif section == "task":
+            if self.current_show and self.current_asset:
+                self.populate_tasks(self.current_show, self.current_asset)
+        elif section == "files":
+            if self.current_show and self.current_asset and self.current_task:
+                self.populate_files(self.current_show, self.current_asset, self.current_task)
+
+    def load_sort_settings(self):
+        json_path = self.get_default_json_path()
+        if os.path.exists(json_path):
+            with open(json_path, 'r') as f:
+                data = json.load(f)
+            return data.get('sort_settings', {})
+        return {}
+
+    def save_sort_settings(self):
+        json_path = self.get_default_json_path()
+        data = self.check_settings_json()
+        data['sort_settings'] = self.sort_settings
+        with open(json_path, 'w') as f:
+            json.dump(data, f, indent=4)
 
 
     # -------------------------------------------------------------------
@@ -734,7 +840,16 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
                     folder_names.append(match.group(1))
                     folder_paths.append(item)
 
-        return folder_names, folder_paths
+        # Apply sorting
+        sort = self.sort_settings.get('shows', {"by": "name", "order": "asc"})
+        combined = list(zip(folder_names, folder_paths))
+        if sort["by"] == "name":
+            combined.sort(key=lambda x: x[0].lower(), reverse=(sort["order"] == "desc"))
+        else:
+            # By date (folder mtime)
+            combined.sort(key=lambda x: os.path.getmtime(os.path.join(self.project_folder, x[1])), reverse=(sort["order"] == "desc"))
+        folder_names, folder_paths = zip(*combined) if combined else ([], [])
+        return list(folder_names), list(folder_paths)
 
     def get_nice_name(self, folder_name):
         """
@@ -984,15 +1099,12 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
 
         assets = [name for name in os.listdir(full_show_path)
                   if os.path.isdir(os.path.join(full_show_path, name))]
-
-        def sort_key(name):
-            match = re.search(r"b(\d{4})_", name, re.IGNORECASE)
-            if match:
-                return int(match.group(1))
-            else:
-                return float('inf')  # Push to end
-
-        assets.sort(key=sort_key)
+        # Apply sorting
+        sort = self.sort_settings.get('assets', {"by": "name", "order": "asc"})
+        if sort["by"] == "name":
+            assets.sort(key=lambda x: x.lower(), reverse=(sort["order"] == "desc"))
+        else:
+            assets.sort(key=lambda x: os.path.getmtime(os.path.join(full_show_path, x)), reverse=(sort["order"] == "desc"))
 
         row_layout = None
         buttons_in_row = 0
@@ -1128,6 +1240,12 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
         # Get all task folders
         task_names = [name for name in os.listdir(asset_path)
                       if os.path.isdir(os.path.join(asset_path, name))]
+        # Apply sorting
+        sort = self.sort_settings.get('task', {"by": "name", "order": "asc"})
+        if sort["by"] == "name":
+            task_names.sort(key=lambda x: x.lower(), reverse=(sort["order"] == "desc"))
+        else:
+            task_names.sort(key=lambda x: os.path.getmtime(os.path.join(asset_path, x)), reverse=(sort["order"] == "desc"))
 
         for task_name in task_names:
             task_path = os.path.join(asset_path, task_name)
@@ -1376,7 +1494,12 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
 
             files = [f for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f))]
             files = [f for f in files if f.endswith(('.ma', '.mb', '.py', '.mel', '.fbx', '.abc'))]
-            files.sort(reverse=True)
+            # Apply sorting
+            sort = self.sort_settings.get('files', {"by": "name", "order": "asc"})
+            if sort["by"] == "name":
+                files.sort(key=lambda x: x.lower(), reverse=(sort["order"] == "desc"))
+            else:
+                files.sort(key=lambda x: os.path.getmtime(os.path.join(folder, x)), reverse=(sort["order"] == "desc"))
 
             for f in files:
                 if f.startswith('.'):
