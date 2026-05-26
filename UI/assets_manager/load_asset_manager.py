@@ -1000,16 +1000,7 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
             if child.widget():
                 child.widget().deleteLater()
 
-        def extract_number(name):
-            name = os.path.basename(name)
-            name = name.split('_')[0]
-            name = name.replace('b', '')
-            print('Num', name)
-            return int(name)
-
-        combined = sorted(zip(folder_paths, folder_names), key=lambda x: extract_number(x[0]))
-
-        for path, name in combined:
+        for path, name in zip(folder_paths, folder_names):
             print(name, path)
             pretty_label = self.split_camel_case(name)
             if nda_mode:
