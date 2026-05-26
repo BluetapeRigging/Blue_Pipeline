@@ -41,12 +41,14 @@ try:
     from PySide6 import QtUiTools
     from PySide6 import QtWidgets
     from PySide6.QtWidgets import *
+    QAction = QtGui.QAction
 except:
     from shiboken2 import wrapInstance
     from PySide2 import QtGui, QtCore
     from PySide2 import QtUiTools
     from PySide2 import QtWidgets
     from PySide2.QtWidgets import *
+    QAction = QtWidgets.QAction
 
 import maya.OpenMayaUI as omui
 from functools import partial
@@ -349,7 +351,7 @@ class AssetsManagerUI(QtBlueWindow.Qt_Blue):
         for by in ["name", "date"]:
             for order, label in [("asc", "Ascending"), ("desc", "Descending")]:
                 text = f"Sort by {by.title()} ({label})"
-                action = QtGui.QAction(text, menu)
+                action = QAction(text, menu)
                 action.setCheckable(True)
                 action.setChecked(current["by"] == by and current["order"] == order)
                 action.triggered.connect(lambda checked=False, b=by, o=order, s=section: self.set_sort(s, b, o))
