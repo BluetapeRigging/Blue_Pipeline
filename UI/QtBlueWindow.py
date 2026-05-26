@@ -471,5 +471,5 @@ class Qt_Blue(QtWidgets.QMainWindow):
 
     # ------------------------------------------------
     def create_menu(self):
-        self.menu = load_menu.Menu()
+        self.menu = load_menu.Menu(owner=self)
         self.master_ui.menuLayout.addWidget(self.menu)

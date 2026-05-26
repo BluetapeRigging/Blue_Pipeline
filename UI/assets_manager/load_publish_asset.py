@@ -96,6 +96,14 @@ from Blue_Pipeline.UI import QtBlueWindow
 reload(QtBlueWindow)
 Qt_Blue = QtBlueWindow.Qt_Blue()
 
+from Blue_Pipeline.Checks.base_check import BaseCheck
+
+# Maps the comboBox display name to the checks sub-folder name
+DEPT_MAP = {
+    'Rig':   'rigging',
+    'Model': 'modeling',
+}
+
 # -------------------------------------------------------------------
 
 
@@ -111,6 +119,7 @@ class PublishAsset(QtBlueWindow.Qt_Blue):
         self.asset_name = asset_name  # e.g., 'Cube'
         self.mode = mode
         self.task_name = os.path.basename(save_path)  # e.g., 'Model'
+        self._check_rows = []
         self.setWindowTitle(Title)
 
         self.setFixedSize(400, 600)
@@ -130,6 +139,8 @@ class PublishAsset(QtBlueWindow.Qt_Blue):
         """
         self.set_blue_buttons()
         self.ui.export_name_line.setText(self.get_versioning_name())
+        self._set_smart_department()
+        self._build_check_rows()
 
     def create_connections(self):
         """
@@ -139,17 +150,269 @@ class PublishAsset(QtBlueWindow.Qt_Blue):
         """
         self.ui.publish_asset_button.clicked.connect(self.publish_asset)
         self.ui.publish_preset_combo.currentIndexChanged.connect(self.update_export_name)
+        self.ui.run_checks_button.clicked.connect(self._run_checks)
+        self.ui.comboBox.currentIndexChanged.connect(self._build_check_rows)
 
+
+    # ------------------------------------------------------------------ check system
+
+    def _log_message(self, message):
+        """Append a message to the check log."""
+        self.ui.check_log.appendPlainText(message)
+
+    def _clear_log(self):
+        """Clear the check log."""
+        self.ui.check_log.clear()
+
+    def _set_smart_department(self):
+        """Try to match the task_name to a combo box option."""
+        task_lower = self.task_name.lower()
+        for i in range(self.ui.comboBox.count()):
+            item_text = self.ui.comboBox.itemText(i).lower()
+            if task_lower == item_text:
+                self.ui.comboBox.setCurrentIndex(i)
+                return
+        # If no match, default to first item (usually Model)
+        self.ui.comboBox.setCurrentIndex(0)
+
+    def _load_checks_from_folder(self, folder_name):
+        """Load checks from a specific folder.
+        
+        Parameters
+        ----------
+        folder_name : str
+            The folder name under Blue_Pipeline/Checks/ (e.g., 'modeling', 'general')
+        
+        Returns
+        -------
+        list : List of BaseCheck instances
+        """
+        checks_dir = os.path.join(FOLDER, 'Checks', folder_name)
+        instances = []
+
+        if not os.path.isdir(checks_dir):
+            return instances
+
+        for filename in sorted(os.listdir(checks_dir)):
+            if filename.startswith('_') or not filename.endswith('.py'):
+                continue
+            module_name = 'Blue_Pipeline.Checks.{}.{}'.format(folder_name, filename[:-3])
+            try:
+                module = importlib.import_module(module_name)
+                reload(module)
+                for attr_name in dir(module):
+                    cls = getattr(module, attr_name)
+                    if (
+                        isinstance(cls, type)
+                        and issubclass(cls, BaseCheck)
+                        and cls is not BaseCheck
+                    ):
+                        instances.append(cls())
+            except Exception as e:
+                cmds.warning('Failed to load check {}: {}'.format(module_name, e))
+
+        return instances
+
+    def _discover_checks(self, department):
+        """Import and instantiate every BaseCheck subclass found in
+        Blue_Pipeline/Checks/<dept_folder>/ and Blue_Pipeline/Checks/general/.
+        Returns a list of instances."""
+        dept_folder = DEPT_MAP.get(department, department.lower())
+        instances = []
+
+        # Load department-specific checks
+        instances.extend(self._load_checks_from_folder(dept_folder))
+
+        # Load general checks (available for all departments)
+        instances.extend(self._load_checks_from_folder('general'))
+
+        return instances
+
+    def _build_check_rows(self):
+        """Clear check_layout and rebuild rows for the selected department."""
+        layout = self.ui.check_layout
+        while layout.count():
+            item = layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        self._clear_log()
+        self._check_rows = []
+        dept   = self.ui.comboBox.currentText()
+        checks = self._discover_checks(dept)
+
+        for check in checks:
+            row = self._create_check_row(check)
+            layout.addWidget(row)
+            self._check_rows.append(row)
+
+    def _create_check_row(self, check_instance):
+        """Build and return a single check-row QWidget."""
+        row    = QtWidgets.QWidget()
+        layout = QtWidgets.QHBoxLayout(row)
+        layout.setContentsMargins(4, 2, 4, 2)
+        layout.setSpacing(6)
+
+        name_lbl = QtWidgets.QLabel(check_instance.name)
+        name_lbl.setMinimumWidth(150)
+
+        status_btn = QtWidgets.QPushButton('Pending')
+        status_btn.setFixedWidth(70)
+        status_btn.setEnabled(False)
+        status_btn.setStyleSheet('background-color: #555555; color: #aaaaaa;')
+
+        fix_btn = QtWidgets.QPushButton('Auto Fix')
+        fix_btn.setFixedWidth(70)
+        fix_btn.setVisible(False)
+        if check_instance.can_fix:
+            fix_btn.clicked.connect(partial(self._run_autofix, row))
+
+        layout.addWidget(name_lbl)
+        layout.addStretch()
+        layout.addWidget(status_btn)
+        layout.addWidget(fix_btn)
+
+        # stash references on the widget for later updates
+        row._check      = check_instance
+        row._status_btn = status_btn
+        row._fix_btn    = fix_btn
+
+        return row
+
+    def _run_checks(self):
+        """Run every check and update its row's status button."""
+        self._clear_log()
+        self._log_message('Running checks for {}...'.format(self.ui.comboBox.currentText()))
+        self._log_message('')
+        
+        for row in self._check_rows:
+            try:
+                passed = row._check.check()
+            except Exception as e:
+                cmds.warning('Check "{}" raised an error: {}'.format(row._check.name, e))
+                passed = False
+
+            row._status_btn.setEnabled(True)
+            if passed:
+                row._status_btn.setText('OK')
+                row._status_btn.setStyleSheet('background-color: #4CAF50; color: white;')
+                row._fix_btn.setVisible(False)
+                self._log_message('[OK] {}'.format(row._check.name))
+            else:
+                row._status_btn.setText('Error')
+                row._status_btn.setStyleSheet('background-color: #F44336; color: white;')
+                if row._check.can_fix:
+                    row._fix_btn.setVisible(True)
+                    self._log_message('[ERROR] {} [FIXABLE]'.format(row._check.name))
+                else:
+                    self._log_message('[ERROR] {}'.format(row._check.name))
+                
+                # Log detailed failure info if available
+                if hasattr(row._check, 'failures') and row._check.failures:
+                    self._log_failure_details(row._check)
+        
+        self._log_message('')
+        self._log_message('Checks complete.')
+
+    def _log_failure_details(self, check_instance):
+        """Log detailed information about a check's failures."""
+        check_name = check_instance.name
+        
+        if check_name == "Controls at Default Values" and hasattr(check_instance, 'failures'):
+            # Group failures by control
+            by_ctrl = {}
+            for ctrl, attr, current, expected in check_instance.failures:
+                if ctrl not in by_ctrl:
+                    by_ctrl[ctrl] = []
+                by_ctrl[ctrl].append((attr, current, expected))
+            
+            for ctrl, attrs in sorted(by_ctrl.items()):
+                ctrl_short = ctrl.split('|')[-1]  # Just the short name
+                attr_list = ', '.join(['{}: {} (expect {})'.format(a, round(c, 3), round(e, 3)) 
+                                       for a, c, e in attrs])
+                self._log_message('  > {}: {}'.format(ctrl_short, attr_list))
+        
+        elif check_name == "No Unused Influences" and hasattr(check_instance, 'failures'):
+            # Group by geometry
+            by_geo = {}
+            for sc, geo, inf in check_instance.failures:
+                if geo not in by_geo:
+                    by_geo[geo] = []
+                by_geo[geo].append(inf)
+            
+            for geo, infs in sorted(by_geo.items()):
+                geo_short = geo.split('|')[-1]  # Just the short name
+                inf_names = ', '.join([i.split('|')[-1] for i in infs])
+                self._log_message('  > {}: {}'.format(geo_short, inf_names))
+
+    def _run_autofix(self, row):
+        """Run the autofix for a row, then re-evaluate the check."""
+        self._log_message('')
+        self._log_message('Applying autofix for: {}'.format(row._check.name))
+        
+        try:
+            row._check.autofix()
+        except Exception as e:
+            cmds.warning('Autofix "{}" raised an error: {}'.format(row._check.name, e))
+            self._log_message('[AUTOFIX FAILED] {}'.format(row._check.name))
+
+        # Re-run the check so the button reflects the new state
+        try:
+            passed = row._check.check()
+        except Exception:
+            passed = False
+
+        if passed:
+            row._status_btn.setText('OK')
+            row._status_btn.setStyleSheet('background-color: #4CAF50; color: white;')
+            row._fix_btn.setVisible(False)
+            self._log_message('[OK] {} (fixed)'.format(row._check.name))
+        else:
+            row._status_btn.setText('Error')
+            row._status_btn.setStyleSheet('background-color: #F44336; color: white;')
+            self._log_message('[ERROR] {} (fix did not resolve)'.format(row._check.name))
+            if hasattr(row._check, 'failures') and row._check.failures:
+                self._log_failure_details(row._check)
+
+    # ------------------------------------------------------------------ buttons
 
     def set_blue_buttons(self):
         buttons = [
             self.ui.publish_asset_button
         ]
 
+        blue_style = """
+            QPushButton {
+                background-color: #3b5998;
+                color: #f0f0f0;
+                border-radius: 6px;
+                font-weight: bold;
+                padding: 6px;
+                border: 1px solid #2e3e5c;
+            }
+            QPushButton:hover {
+                background-color: #4a69ad;
+                border: 1px solid #3c4d6e;
+            }
+            QPushButton:pressed {
+                background-color: #2d4474;
+            }
+        """
+        
         for btn in buttons:
-            btn.setObjectName("BlueButton")
-            btn.style().unpolish(btn)
-            btn.style().polish(btn)
+            btn.setStyleSheet(blue_style)
+            btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+            btn.customContextMenuRequested.connect(self._open_publish_path_from_context)
+
+    def _open_publish_path_from_context(self, _point):
+        target_path = os.path.normpath(os.path.join(self.save_path, self.mode))
+        if not os.path.exists(target_path):
+            return
+
+        if os.name == "nt":
+            os.startfile(target_path)
+        elif os.name == "posix":
+            QtCore.QProcess.startDetached("open", [target_path])
 
     # -------------------------------------------------------------------
     def get_next_version_number(self, folder_path, name, task, padding=4):

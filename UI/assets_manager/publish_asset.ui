@@ -125,7 +125,27 @@
          </widget>
         </item>
         <item>
+         <widget class="QPushButton" name="run_checks_button">
+          <property name="text">
+           <string>Run Checks</string>
+          </property>
+         </widget>
+        </item>
+        <item>
          <layout class="QVBoxLayout" name="check_layout"/>
+        </item>
+        <item>
+         <widget class="QPlainTextEdit" name="check_log">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+          <property name="maximumHeight">
+           <number>120</number>
+          </property>
+          <property name="placeholderText">
+           <string>Check messages will appear here...</string>
+          </property>
+         </widget>
         </item>
         <item>
          <spacer name="verticalSpacer_2">
@@ -135,7 +155,7 @@
           <property name="sizeHint" stdset="0">
            <size>
             <width>20</width>
-            <height>40</height>
+            <height>10</height>
            </size>
           </property>
          </spacer>

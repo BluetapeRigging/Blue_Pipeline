@@ -28,6 +28,8 @@ All feedback, suggestions, and contributions are very welcome! Please feel free 
 - **Functionalities**
   - Create new shows and assets.
   - Automatically populate shows and assets from the project path.
+  - Automatically creates a `workspace.mel` per show (if missing).
+  - Automatically sets the Maya project to the show workspace when opening scenes from the manager.
   - Stores the last used show for quick access.
   - Easy-to-read and extendable code.
 

@@ -1,0 +1,75 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# Python tooling caches
+.tox/
+.nox/
+.hypothesis/
+.ipynb_checkpoints/
+.dmypy.json
+dmypy.json
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Test and coverage artifacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Type check / lint caches
+.mypy_cache/
+.pyre/
+.ruff_cache/
+.pytype/
+
+# IDE / editor settings
+.idea/
+.vscode/
+*.code-workspace
+
+# Editor swap/backup files
+*.swp
+*.swo
+*~
+*.orig
+*.rej
+
+# OS generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs and temp
+*.log
+*.tmp
+*.bak
+
+# Local env files
+.env
+.env.*
+
+# Maya temporary/cache artifacts
+autosave/
+cache/
+renderData/
+tmp/
+*.swatches
+*.mayaSwatches
+*.ma~
+*.mb~

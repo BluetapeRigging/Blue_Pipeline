@@ -147,10 +147,38 @@ class SaveWIP(QtBlueWindow.Qt_Blue):
             self.ui.save_wip
         ]
 
+        blue_style = """
+            QPushButton {
+                background-color: #3b5998;
+                color: #f0f0f0;
+                border-radius: 6px;
+                font-weight: bold;
+                padding: 6px;
+                border: 1px solid #2e3e5c;
+            }
+            QPushButton:hover {
+                background-color: #4a69ad;
+                border: 1px solid #3c4d6e;
+            }
+            QPushButton:pressed {
+                background-color: #2d4474;
+            }
+        """
+        
         for btn in buttons:
-            btn.setObjectName("BlueButton")
-            btn.style().unpolish(btn)
-            btn.style().polish(btn)
+            btn.setStyleSheet(blue_style)
+            btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+            btn.customContextMenuRequested.connect(self._open_save_path_from_context)
+
+    def _open_save_path_from_context(self, _point):
+        target_path = os.path.normpath(self.save_path)
+        if not os.path.exists(target_path):
+            return
+
+        if os.name == "nt":
+            os.startfile(target_path)
+        elif os.name == "posix":
+            QtCore.QProcess.startDetached("open", [target_path])
 
     # -------------------------------------------------------------------
 
